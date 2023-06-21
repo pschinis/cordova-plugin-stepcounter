@@ -31,9 +31,8 @@ module.exports = {
     ACTION_CAN_COUNT_STEPS : "can_count_steps",
     ACTION_GET_HISTORY     : "get_history",
 
-    start: function (offset, successCallback, errorCallback) {
-        offset = parseInt(offset) || 0;
-        cordova.exec(successCallback, errorCallback, "CordovaStepCounter", "start", [offset]);
+    start: function (postUrl, successCallback, errorCallback) {
+        cordova.exec(successCallback, errorCallback, "CordovaStepCounter", "start", [postUrl]);
     },
  
     stop: function ( successCallback, errorCallback) {

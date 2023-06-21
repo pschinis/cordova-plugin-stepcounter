@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <plugin xmlns="http://www.phonegap.com/ns/plugins/1.0"
         id="net.texh.cordovapluginstepcounter"
-        version="0.0.10">
+        version="0.1.0">
 
   <name>Cordova Step Counter Plugin</name>
 
@@ -18,15 +18,15 @@
   <platform name="android">
 
     <config-file target="AndroidManifest.xml" parent="/manifest/application">
-        <service android:name="net.texh.cordovapluginstepcounter.StepCounterService" android:enabled="true" android:process=":cordovapluginstepcounter" />
+        <service android:name="net.texh.cordovapluginstepcounter.StepCounterService" android:enabled="true" android:process=":cordovapluginstepcounter" android:permission="android.permission.BIND_JOB_SERVICE" />
 
         <!--
              * This class is triggered upon reboot of the device. It needs to re-register
              * the STEP_COUNTER with the StepCounterService
              -->
-        <receiver android:name="net.texh.cordovapluginstepcounter.StepCounterBootReceiver" >
+        <receiver android:name="net.texh.cordovapluginstepcounter.StepCounterShutdownReceiver" android:exported="false">
             <intent-filter>
-                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.ACTION_SHUTDOWN" />
             </intent-filter>
         </receiver>
     </config-file>
@@ -34,7 +34,10 @@
     <config-file target="AndroidManifest.xml" parent="/manifest">
       <uses-feature android:name="android.hardware.sensor.stepcounter" />
       <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
-      <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+      <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION"/>
+      <uses-permission android:name="android.gms.permission.ACTIVITY_RECOGNITION"/>
+      <uses-permission android:name="android.permission.DEVICE_POWER" />
+      <uses-permission android:name="android.permission.BIND_JOB_SERVICE" />
     </config-file>
 
     <config-file target="res/xml/config.xml" parent="/*">
@@ -48,15 +51,8 @@
 
     <source-file src="src/android/net/texh/cordovapluginstepcounter/CordovaStepCounter.java" target-dir="src/net/texh/cordovapluginstepcounter/"/>
     <source-file src="src/android/net/texh/cordovapluginstepcounter/StepCounterService.java" target-dir="src/net/texh/cordovapluginstepcounter/"/>
-    <source-file src="src/android/net/texh/cordovapluginstepcounter/StepCounterBootReceiver.java" target-dir="src/net/texh/cordovapluginstepcounter/"/>
-    <source-file src="src/android/net/texh/cordovapluginstepcounter/StepChangeListener.java" target-dir="src/net/texh/cordovapluginstepcounter/"/>
     <source-file src="src/android/net/texh/cordovapluginstepcounter/StepCounterHelper.java" target-dir="src/net/texh/cordovapluginstepcounter/"/>
     <source-file src="src/android/net/texh/cordovapluginstepcounter/StepCounterShutdownReceiver.java" target-dir="src/net/texh/cordovapluginstepcounter/"/>
-    <source-file src="src/android/net/texh/cordovapluginstepcounter/StepSensorManager.java" target-dir="src/net/texh/cordovapluginstepcounter/"/>
-
-    <source-file src="src/android/res/layout/sticky_notification.xml" target-dir="res/layout"/>
-    <source-file src="src/android/res/drawable-hdpi/notification_icon.png" target-dir="res/drawable"/>
-    <source-file src="src/android/res/drawable-hdpi/notification_image.png" target-dir="res/drawable"/>
     
   </platform>
 

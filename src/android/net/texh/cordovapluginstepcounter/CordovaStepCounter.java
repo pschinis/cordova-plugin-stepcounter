@@ -25,15 +25,22 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import android.Manifest;
 import android.app.Activity;
+import android.app.job.JobInfo;
+import android.app.job.JobScheduler;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.os.Build;
-import android.support.annotation.NonNull;
-import android.support.v4.content.ContextCompat;
+import androidx.annotation.NonNull;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
 import android.util.Log;
+
+import androidx.core.content.ContextCompat;
 
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -50,6 +57,7 @@ public class CordovaStepCounter extends CordovaPlugin {
     private final String ACTION_GET_TODAY_STEPS  = "get_today_step_count";
     private final String ACTION_CAN_COUNT_STEPS  = "can_count_steps";
     private final String ACTION_GET_HISTORY      = "get_history";
+    private final int PERMISSION_REQUEST_CODE = 598;
 
 
     @Override
@@ -69,9 +77,35 @@ public class CordovaStepCounter extends CordovaPlugin {
                 Log.i(TAG, "Step detector not supported");
                 return true;
             }
+            
+            try {
+                String postUrl = data.getString(0);
+                StepCounterHelper.saveDataUrl(postUrl,activity.getApplicationContext());
+            } catch (JSONException e) {
+                Log.i(TAG, "Saving data url failed... exiting.");
+                e.printStackTrace();
+                return false;
+            }
+            CordovaPlugin plugin = this;
 
-            Log.i(TAG, "Starting StepCounterService ...");
-            ContextCompat.startForegroundService(activity, stepCounterIntent);
+            cordova.getThreadPool().execute(new Runnable(){
+                @Override
+                public void run() {
+                    int permissionResult = ContextCompat.checkSelfPermission(activity, Manifest.permission.ACTIVITY_RECOGNITION);
+                    if (permissionResult != PackageManager.PERMISSION_GRANTED) {
+                        //shouldShowRequestPermissionRationale will return false if the user has never seen the prompt before. Will also return false 
+                        //if user denied and hit don't ask again but that's ok because then system will prevent prompt from showing
+                        Boolean shouldShowPrompt = !ActivityCompat.shouldShowRequestPermissionRationale(activity,Manifest.permission.ACTIVITY_RECOGNITION);
+                        if(shouldShowPrompt) {
+                            String[] permissions = {Manifest.permission.ACTIVITY_RECOGNITION};
+                            cordova.requestPermissions(plugin,PERMISSION_REQUEST_CODE,permissions);
+                        }
+                    } else {
+                        Log.i(TAG, "Starting StepCounterService ...");
+                        scheduleStepCounterJob();
+                    }
+                }
+            });
         }
         else if (ACTION_STOP.equals(action)) {
             Log.i(TAG, "Stopping StepCounterService");
@@ -137,6 +171,13 @@ public class CordovaStepCounter extends CordovaPlugin {
         return true;
     }
 
+    @Override
+    public void onRequestPermissionResult(int requestCode, String[] permissions, int[] grantResults) throws JSONException {
+        if(requestCode == PERMISSION_REQUEST_CODE && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+            this.scheduleStepCounterJob();
+        }
+    }
+
     private static boolean deviceHasStepCounter(PackageManager pm) {
         // Check that the device supports the step counter and detector sensors
         return Build.VERSION.SDK_INT >= 19 && pm.hasSystemFeature(PackageManager.FEATURE_SENSOR_STEP_COUNTER);
@@ -148,5 +189,22 @@ public class CordovaStepCounter extends CordovaPlugin {
         // StepCounter sensor and in the UI process. Because we have specified the service to run
         // in its own process in the AndroidManifest.xml.
         return context.getSharedPreferences(key, Context.MODE_PRIVATE | Context.MODE_MULTI_PROCESS);
+    }
+
+    private void scheduleStepCounterJob() {
+        Context context = this.cordova.getActivity().getApplicationContext();
+        ComponentName componentName = new ComponentName(context, StepCounterService.class);
+        JobInfo jobInfo = new JobInfo.Builder(1, componentName)
+                .setPeriodic(60 * 60 * 1000)  // 15 minutes (in milliseconds)
+                .setPersisted(true)           // Persist job across device reboots
+                .build();
+
+        JobScheduler jobScheduler = (JobScheduler) context.getSystemService(Context.JOB_SCHEDULER_SERVICE);
+        int resultCode = jobScheduler.schedule(jobInfo);
+        if (resultCode == JobScheduler.RESULT_SUCCESS) {
+            Log.i("MyJobService", "Job scheduled successfully!");
+        } else {
+            Log.i("MyJobService", "Job scheduling failed!");
+        }
     }
 }

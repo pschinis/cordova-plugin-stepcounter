@@ -2,14 +2,28 @@ package net.texh.cordovapluginstepcounter;
 
 import android.content.Context;
 import android.content.SharedPreferences;
-import android.support.annotation.NonNull;
+import androidx.annotation.NonNull;
 
+import android.util.Log;
+import android.webkit.CookieManager;
+
+import org.json.JSONException;
 import org.json.JSONObject;
+import org.json.JSONArray;
 
+import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.Locale;
+
+import okhttp3.Call;
+import okhttp3.Callback;
+import okhttp3.MediaType;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.RequestBody;
+import okhttp3.Response;
 
 /**
  * Created by Digitalsunray Media GmbH. On 19.07.2018.
@@ -18,9 +32,11 @@ class StepCounterHelper {
 
     //region Constants
 
+    private static final String TAG="StepCounterHelper";
     private static final String DEFAULT_DATE_PATTERN = "yyyy-MM-dd";
     private static final String PREFERENCE_NAME = "UserData";
     private static final String PREF_KEY_PEDOMETER_DATA = "pedometerData";
+    private static final String PREF_KEY_PEDOMETER_URL = "pedometerDataUrl";
     private static final String PEDOMETER_DATA_STEPS = "steps";
     private static final String PEDOMETER_DATA_OFFSET = "offset";
     private static final String PEDOMETER_DATA_DAILY_BUFFER = "buffer";
@@ -28,6 +44,84 @@ class StepCounterHelper {
     //endregion
 
     //region Static Methods
+
+    static void saveDataUrl(@NonNull String url,@NonNull Context context) {
+            SharedPreferences sharedPref = CordovaStepCounter.getDefaultSharedPreferencesMultiProcess(context,PREFERENCE_NAME);
+            SharedPreferences.Editor editor = sharedPref.edit();
+            editor.putString(PREF_KEY_PEDOMETER_URL, url);
+            editor.apply();
+    }
+
+    static String getDataUrl(@NonNull Context context) {
+            SharedPreferences sharedPref = CordovaStepCounter.getDefaultSharedPreferencesMultiProcess(context,PREFERENCE_NAME);
+            if(sharedPref.contains(PREF_KEY_PEDOMETER_URL)){
+                String pDataString = sharedPref.getString(PREF_KEY_PEDOMETER_URL,null);
+                return pDataString;
+            }
+
+            return null;
+    }
+
+    static void sendSteps(@NonNull Context context) {
+        String url = getDataUrl(context);
+        if(url != null) {
+            String cookies = CookieManager.getInstance().getCookie(url);
+            Date currentDate = new Date();
+            SimpleDateFormat dateFormatter = new SimpleDateFormat(DEFAULT_DATE_PATTERN, Locale.getDefault());
+            String currentDateString = dateFormatter.format(currentDate);
+            OkHttpClient client = new OkHttpClient();
+            JSONObject data = new JSONObject();
+            JSONObject body = new JSONObject();
+
+            try {
+                int steps = getTodaySteps(context);
+                if(steps <= 0) {
+                    return;
+                }
+                data.put("startDate",currentDateString);
+                data.put("quantity",steps);
+                JSONArray bodyArr = new JSONArray();
+                bodyArr.put(data);
+                body.put("steps",bodyArr);
+            } catch (JSONException e) {
+                Log.i(TAG, "Sending step data failed... exiting.");
+                e.printStackTrace();
+                return;
+            }
+
+            Request.Builder builder = new Request.Builder()
+                .url(url)
+                .post(RequestBody.create(MediaType.parse("application/json; charset=utf-8"), body.toString()));
+
+            if (cookies != null) {
+                builder.addHeader("Cookie", cookies);
+            }
+
+            Request request = builder.build();
+
+            try {
+                client.newCall(request).enqueue(new Callback() {
+                    @Override
+                    public void onFailure(Call call, IOException e) {
+                        Log.i(TAG, "Sending step data request failed... exiting.");
+                        e.printStackTrace();
+                    }
+
+                    @Override
+                    public void onResponse(Call call, Response response) throws IOException {
+                        if (!response.isSuccessful()) {
+                            Log.i(TAG, "Sending step data request failed... exiting.");
+                        } else {
+                            Log.i(TAG, "Successfully sent step data.");
+                        }
+                    }
+                });
+            } catch(Throwable e) {
+                Log.i(TAG, "Sending step data request failed... exiting.");
+                e.printStackTrace();
+            }
+        }
+    }
 
     static int saveSteps(float sensorValue, @NonNull Context context) {
         try {
