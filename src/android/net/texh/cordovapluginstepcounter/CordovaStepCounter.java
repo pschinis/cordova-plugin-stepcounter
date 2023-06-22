@@ -58,6 +58,7 @@ public class CordovaStepCounter extends CordovaPlugin {
     private final String ACTION_CAN_COUNT_STEPS  = "can_count_steps";
     private final String ACTION_GET_HISTORY      = "get_history";
     private final int PERMISSION_REQUEST_CODE = 598;
+    private final int JOB_ID = 1375;
 
 
     @Override
@@ -194,7 +195,7 @@ public class CordovaStepCounter extends CordovaPlugin {
     private void scheduleStepCounterJob() {
         Context context = this.cordova.getActivity().getApplicationContext();
         ComponentName componentName = new ComponentName(context, StepCounterService.class);
-        JobInfo jobInfo = new JobInfo.Builder(1, componentName)
+        JobInfo jobInfo = new JobInfo.Builder(JOB_ID, componentName)
                 .setPeriodic(60 * 60 * 1000)  // 15 minutes (in milliseconds)
                 .setPersisted(true)           // Persist job across device reboots
                 .build();
