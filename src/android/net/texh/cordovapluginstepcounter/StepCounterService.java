@@ -46,6 +46,8 @@ import androidx.annotation.NonNull;
 import androidx.core.app.NotificationCompat;
 import android.util.Log;
 import android.widget.RemoteViews;
+import java.util.Timer;
+import java.util.TimerTask;
 
 import com.strongrfastr.cordova.R;
 
@@ -74,6 +76,16 @@ public class StepCounterService extends JobService {
 
         StepCounterService me = this;
 
+        //failsafe in case the sensor doesn't get triggered
+        Timer timer = new Timer();
+        TimerTask task = new TimerTask() {
+            @Override
+            public void run() {
+                Log.d(TAG, "StepCounterService: terminating due to timer...");
+                terminateTheJob(params);
+            }
+        };
+
         try {
             sensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
             if(sensorManager != null) {
@@ -88,20 +100,7 @@ public class StepCounterService extends JobService {
                             StepCounterHelper.saveSteps(steps, me);
                             StepCounterHelper.sendSteps(me);
 
-                            // Stop listening to sensor changes
-                            sensorManager.unregisterListener(sensorEventListener);
-
-                            Log.d(TAG, "StepCounterService: stopping foreground service...");
-                            // Stop the foreground service
-                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                                stopForeground(JobService.STOP_FOREGROUND_REMOVE);
-                            } else {
-                                stopForeground(true);
-                            }
-                            isRunning = false;
-
-                            // Notify the system that the job has finished
-                            jobFinished(params, false);
+                            terminateTheJob(params);
                         }
 
                         @Override
@@ -124,20 +123,42 @@ public class StepCounterService extends JobService {
             throwable.printStackTrace();
         }
 
+        Log.d(TAG, "Scheduling fail safe termination...");
+        timer.schedule(task, 5000);
+
         return false;
     }
 
     @Override
     public boolean onStopJob(JobParameters params) {
-        sensorManager.unregisterListener(sensorEventListener);
+        terminateTheJob(params);
         Log.d(TAG, "Step counter job interrupted... ");
-        return true; // Return true to restart the job if it's stopped before completion.
+        return false; // Return true to restart the job if it's stopped before completion.
     }
 
     @Override
     public void onDestroy() {
         Log.d(TAG, "Destroying step counter job... ");
         super.onDestroy();
+    }
+
+    private void terminateTheJob(JobParameters params) {
+        // Stop listening to sensor changes
+        if(isRunning) {
+            sensorManager.unregisterListener(sensorEventListener);
+
+            Log.d(TAG, "StepCounterService: stopping foreground service...");
+            // Stop the foreground service
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                stopForeground(JobService.STOP_FOREGROUND_REMOVE);
+            } else {
+                stopForeground(true);
+            }
+            isRunning = false;
+
+            // Notify the system that the job has finished
+            jobFinished(params, false);
+        }
     }
 
         /* Used to build and start foreground service. */
