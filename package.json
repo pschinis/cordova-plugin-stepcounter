@@ -1,8 +1,8 @@
 {
-  "name": "net.texh.cordovapluginstepcounter",
+  "name": "com.pschinis.stepcounterplugin",
   "version": "0.2.0",
   "cordova": {
-    "id": "net-texh-cordovapluginstepcounter",
+    "id": "com.pschinis.stepcounterplugin",
     "platforms": [
       "android"
     ]
