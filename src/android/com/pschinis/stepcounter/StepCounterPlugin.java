@@ -6,6 +6,7 @@ import android.util.Log;
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.GoogleApiAvailability;
 import com.google.android.gms.fitness.FitnessLocal;
+import com.google.android.gms.fitness.data.LocalBucket;
 import com.google.android.gms.fitness.data.LocalDataSet;
 import com.google.android.gms.fitness.data.LocalDataPoint;
 import com.google.android.gms.fitness.data.LocalDataType;
@@ -23,6 +24,7 @@ import org.json.JSONObject;
 
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 import android.Manifest;
@@ -117,27 +119,35 @@ public class StepCounterPlugin extends CordovaPlugin {
                     .addOnSuccessListener(new OnSuccessListener<LocalDataReadResponse>() {
                         @Override
                         public void onSuccess(LocalDataReadResponse localDataReadResponse) {
-                            LocalDataSet dataSet = localDataReadResponse.getDataSet(LocalDataType.TYPE_STEP_COUNT_DELTA);
+                            List<LocalBucket> bucketList = localDataReadResponse.getBuckets();
                             JSONArray resultArray = new JSONArray();
-                            for (LocalDataPoint dp : dataSet.getDataPoints()) {
-                                JSONObject dataPointJson = new JSONObject();
-                                try {
-                                    // Convert start time to YYYY-MM-DD format
-                                    LocalDateTime startDate = LocalDateTime.ofEpochSecond(
-                                            dp.getStartTime(TimeUnit.SECONDS),
-                                            0,
-                                            ZoneId.systemDefault().getRules().getOffset(LocalDateTime.now())
-                                    );
-                                    String formattedDate = startDate.toLocalDate().toString();
-                                    dataPointJson.put("date", formattedDate);
-                                    dataPointJson.put("steps", dp.getValue(LocalField.FIELD_STEPS).asInt());
-                                } catch (JSONException e) {
-                                    Log.i(TAG, "Failed adding object to steps array...");
-                                    e.printStackTrace();
+
+                            for(LocalBucket bucket : bucketList) {
+                                LocalDataSet dataSet = bucket.getDataSet(LocalDataType.TYPE_STEP_COUNT_DELTA);
+                                if(dataSet != null) {
+                                    for (LocalDataPoint dp : dataSet.getDataPoints()) {
+                                        JSONObject dataPointJson = new JSONObject();
+                                        try {
+                                            // Convert start time to YYYY-MM-DD format
+                                            LocalDateTime startDate = LocalDateTime.ofEpochSecond(
+                                                    dp.getStartTime(TimeUnit.SECONDS),
+                                                    0,
+                                                    ZoneId.systemDefault().getRules().getOffset(LocalDateTime.now())
+                                            );
+                                            String formattedDate = startDate.toLocalDate().toString();
+                                            dataPointJson.put("date", formattedDate);
+                                            dataPointJson.put("steps", dp.getValue(LocalField.FIELD_STEPS).asInt());
+                                        } catch (JSONException e) {
+                                            Log.i(TAG, "Failed adding object to steps array...");
+                                            e.printStackTrace();
+                                        }
+                                        resultArray.put(dataPointJson);
+                                    }
                                 }
-                                resultArray.put(dataPointJson);
                             }
+                            
                             callbackContext.success(resultArray);
+
                         }
                     })
                     .addOnFailureListener(new OnFailureListener() {
